@@ -28,7 +28,7 @@ def configuration(root: Path, preset: str | None = None, context: int | None = N
                 raise ValueError("Model paths must not contain newlines.")
             installed.append((key, path, model))
     if not installed:
-        raise ValueError("No complete catalog models are installed. Run setup_qwen.sh (or setup_qwen.ps1) first.")
+        raise ValueError("No complete catalog models are installed. Run setup_localharness.sh (or setup_localharness.ps1) first.")
     requested = preset or os.environ.get("QWEN_MODEL_PRESET")
     if requested and requested not in {key for key, _, _ in installed}:
         raise ValueError(f"Startup preset {requested!r} is not installed; download it explicitly using setup first.")

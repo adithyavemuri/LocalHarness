@@ -9,6 +9,9 @@
 | Windows GPU setup | Not provided |
 | macOS / ARM / other architectures | Not supported by this setup workflow |
 | Python 3.10+ | Standard library only; Linux CI checks 3.10 and 3.13 |
+| Managed OpenCode Linux x64 | Pinned install, four-model instruction delivery and web HTTP/config verified |
+| Cline integration | Workspace skills/rules retained; IDE UI activation is not automated |
+| OpenCode Windows x64 | Pinned installer path implemented; runtime validation deferred |
 
 Linux CI runs offline tests and entry-point checks. Windows CI parses PowerShell
 and Python syntax only. Neither job downloads multi-GB weights, compiles the
@@ -26,6 +29,8 @@ build tools and GPU drivers are the user's prerequisites.
 
 The server binds to localhost. This is not authentication or an operating-system
 sandbox. Do not expose the server publicly. Agent mode and UI MCP proxy are
-disabled; this project does not grant models shell, GitHub or WRF access.
+disabled in llama.cpp. The default OpenCode client supplies agent tools under
+its own permissions; Cline remains available. No WRF or GitHub connection is
+automatically granted. See [SKILLS.md](SKILLS.md) for dependencies and limits.
 
 Windows is explicitly a compatibility path, not a tested-platform guarantee.

@@ -26,6 +26,7 @@ import model_router
 from model_config import model_ready, selection
 from run_server import command, server_environment
 from smoke_test import request
+from smoke_test_skills import check_model
 
 
 def main():
@@ -35,6 +36,8 @@ def main():
     parser.add_argument("--models", nargs="+",
                         help="Optional explicit switching sequence, overriding --small/--large")
     parser.add_argument("--backend", choices=("auto", "cpu", "vulkan"), default="auto")
+    parser.add_argument("--skills", action="store_true",
+                        help="Also test shared skill-read tool round-trips for every model in the sequence")
     args = parser.parse_args()
     sequence = args.models or (args.small, args.large, args.small)
     for key in sequence:
@@ -48,7 +51,7 @@ def main():
                                  router=True, host="127.0.0.1", port=port, context=4096,
                                  threads=8, gpu_layers=None, thinking="off")
     invocation = command(options)
-    ini = model_router.prepare(ROOT, port, sequence[0])
+    ini = model_router.prepare(ROOT, port, sequence[0], options.context)
     logs = ROOT / "logs"
     logs.mkdir(exist_ok=True)
     report = {"success": False, "sequence": [], "backend": args.backend, "context": 4096}
@@ -91,6 +94,12 @@ def main():
                 report["sequence"].append(record)
                 if text != "437" or active != [key] or answer.get("model") != key:
                     raise RuntimeError(f"Switch failed: {record}")
+                if args.skills:
+                    print(f"Checking shared skills: {key}", flush=True)
+                    record["skills"] = check_model(base + "/v1", key, timeout=300)
+                    print(f"Shared skills: {key}: {record['skills']['success']}", flush=True)
+            if any(not item.get("skills", {}).get("success", True) for item in report["sequence"]):
+                raise RuntimeError("One or more model skill probes failed; inspect the sequence results.")
             try:
                 request(base + "/v1/chat/completions", {
                     "model": "not-installed-model", "messages": [{"role": "user", "content": "hello"}],

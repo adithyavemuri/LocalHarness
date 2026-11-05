@@ -24,13 +24,13 @@ Safe inspection commands:
 python3 manage_models.py --list
 python3 manage_models.py --install phi4-mini --dry-run
 python3 run_server.py --list-models
-./setup_qwen.sh --preflight
+./setup_localharness.sh --preflight
 python3 model_config.py --preset phi4-mini --verify models/Phi-4-mini-instruct-Q4_K_M.gguf
 ```
 
 `--dry-run` prints commands without downloads, compilation or model startup.
 The explicit `--verify` command reads the full file and may take time.
-On Windows substitute `python`, and use `setup_qwen.ps1 -Preflight`.
+On Windows substitute `python`, and use `setup_localharness.ps1 -Preflight`.
 
 Optional real-model checks (weights/runtime must already be installed):
 

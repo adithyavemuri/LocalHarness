@@ -21,7 +21,10 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Shell syntax
-        run: bash -n setup_qwen.sh start_qwen.sh examples/chat.sh
+        run: |
+          for script in setup_localharness.sh start_localharness.sh setup_qwen.sh start_qwen.sh examples/chat.sh; do
+            bash -n "$script" || exit 1
+          done
       - name: Offline regression tests (no models or GPU)
         run: python -m unittest discover -s tests -v
       - name: Public entry points (no downloads)
@@ -29,6 +32,10 @@ jobs:
           python manage_models.py --list
           python manage_models.py --install phi4-mini --dry-run
           python run_server.py --list-models
+          python setup_cline.py --workspace . --dry-run
+          python setup_opencode.py --workspace . --dry-run
+          python -m local_skills --list
+          python -m local_skills --workspace . --client generic --dry-run
       - name: No generated model/build data tracked
         run: test -z "$(git ls-files models runtime downloads logs build)"
 
@@ -42,7 +49,7 @@ jobs:
           python-version: "3.10"
       - shell: pwsh
         run: |
-          foreach ($script in @("setup_qwen.ps1", "start_qwen.ps1")) {
+          foreach ($script in @("setup_localharness.ps1", "start_localharness.ps1", "setup_qwen.ps1", "start_qwen.ps1")) {
             $tokens = $null
             $errors = $null
             [void][System.Management.Automation.Language.Parser]::ParseFile(
@@ -53,4 +60,4 @@ jobs:
             }
           }
       - name: Python syntax only
-        run: python -m py_compile manage_models.py model_config.py model_router.py run_server.py setup_gpu.py context_planner.py
+        run: python -m py_compile manage_models.py model_config.py model_router.py run_server.py setup_gpu.py context_planner.py setup_cline.py setup_opencode.py opencode_client.py local_skills/__init__.py local_skills/__main__.py examples/smoke_test_skills.py examples/smoke_test_opencode.py

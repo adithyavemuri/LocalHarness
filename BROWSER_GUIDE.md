@@ -1,11 +1,14 @@
-# Run local models in a browser
+# Plain llama.cpp browser chat
+
+OpenCode is now the default browser/agent client; see [SKILLS.md](SKILLS.md).
+This guide covers the retained plain chat interface, with agent tools disabled.
 
 ## First-time setup on Linux
 
 From this directory:
 
 ```bash
-python3 manage_models.py
+python3 manage_models.py --client browser
 ```
 
 Choose a model number, install its weights, then launch it. Choose **B** after
@@ -15,8 +18,8 @@ missing weights and does not install system prerequisites or drivers.
 For explicit script-based setup instead:
 
 ```bash
-./setup_qwen.sh --preflight
-./setup_qwen.sh
+./setup_localharness.sh --preflight
+./setup_localharness.sh
 ```
 
 The first command only checks the host. The second compiles `llama.cpp` locally
@@ -29,13 +32,13 @@ On Windows, follow `WINDOWS_GUIDE.md`.
 Fastest Linux path, including first-time setup when required:
 
 ```bash
-./start_qwen.sh
+./start_localharness.sh --client server
 ```
 
 Fastest Windows path from Developer PowerShell:
 
 ```powershell
-.\start_qwen.ps1
+.\start_localharness.ps1 -Client browser
 ```
 
 Manual launcher commands are below.
@@ -59,10 +62,10 @@ the server.
 Stop your current server once with Ctrl+C. Start router mode:
 
 ```bash
-./start_qwen.sh --router --thinking off
+./start_localharness.sh --client server --router --thinking off
 ```
 
-Windows: `.\start_qwen.ps1 -Router -Thinking off`.
+Windows: `.\start_localharness.ps1 -Client browser -Router -Thinking off`.
 
 Open or refresh `http://127.0.0.1:8080`. In a new chat, use the model selector
 to choose an installed model (Qwen, Gemma or Phi). The default Qwen 4B loads first. When a request selects
@@ -73,7 +76,7 @@ Missing models are not listed or downloaded by the router. For example, to add
 the 30B again, explicitly run this setup command, then restart router mode:
 
 ```bash
-./setup_qwen.sh --model qwen3-30b-a3b --model-only
+./setup_localharness.sh --model qwen3-30b-a3b --model-only
 ```
 
 Router mode is offline and uses only complete catalog weights under `models/`.
@@ -84,8 +87,8 @@ To add the lightweight Gemma/Phi presets, explicitly download them and restart
 router mode. Existing Qwen weights and the shared runtime are reused:
 
 ```bash
-./setup_qwen.sh --model gemma4-e2b --model-only
-./setup_qwen.sh --model phi4-mini --model-only
+./setup_localharness.sh --model gemma4-e2b --model-only
+./setup_localharness.sh --model phi4-mini --model-only
 ```
 
 The selector is not an automatic team of agents. Models can be called sequentially
@@ -95,14 +98,14 @@ through the same `/v1/chat/completions` API, with the preset key as `model`.
 
 Qwen3.5-4B Q4_K_M is the default; its first download is about 2.74 GB. The larger
 27B preset remains selectable. The server uses one slot and prefers a 65,536-token
-context, with automatic memory-based 32K/16K/8K fallbacks. Thinking follows the model's
-own default unless you select `--thinking` explicitly.
+context, with automatic memory-based 32K/16K/8K fallbacks. The low-level server
+preserves model thinking defaults; start scripts request direct answers unless overridden.
 
 To force 64K for every installed model instead of automatic sizing, stop the
 existing server and start it with an explicit override:
 
 ```bash
-./start_qwen.sh --router --context 65536 --thinking off
+./start_localharness.sh --client server --router --context 65536 --thinking off
 ```
 
 `--context` overrides each generated router preset, not only the parent server,
@@ -132,13 +135,13 @@ python3 run_server.py --dry-run
 python3 run_server.py --list-models
 
 # Start the compact model with direct answers
-./start_qwen.sh --preset qwen3.5-4b --thinking off
+./start_localharness.sh --client server --preset qwen3.5-4b --thinking off
 
 # Stop with Ctrl+C before switching to another installed model
-./start_qwen.sh --preset qwen3.8-27b --thinking off --threads 8
+./start_localharness.sh --client server --preset qwen3.8-27b --thinking off --threads 8
 
 # Deliberately install/start the legacy model again
-./start_qwen.sh --preset qwen3-30b-a3b
+./start_localharness.sh --client server --preset qwen3-30b-a3b
 ```
 
 The default host is `127.0.0.1`, so other machines cannot connect. This browser
@@ -148,7 +151,7 @@ require a separate, security-reviewed tool controller.
 Windows model/direct-answer selection:
 
 ```powershell
-.\start_qwen.ps1 -ModelPreset qwen3.5-4b -Thinking off -Threads 8
+.\start_localharness.ps1 -Client browser -ModelPreset qwen3.5-4b -Thinking off -Threads 8
 ```
 
 An old model may have been manually removed to free disk space. Choosing its

@@ -13,6 +13,8 @@ from pathlib import Path
 from model_config import catalog, gpu_runtime, model_ready, runtime_ready, selection
 import context_planner
 import model_router
+import local_skills
+import opencode_client
 
 
 def command(arguments: argparse.Namespace) -> list[str]:
@@ -30,7 +32,7 @@ def command(arguments: argparse.Namespace) -> list[str]:
     if not gpu and not arguments.server and layers != 0:
         raise ValueError("The CPU runtime cannot offload GPU layers. Run setup_gpu.py or use --gpu-layers 0.")
     if not server.is_file():
-        raise FileNotFoundError(f"llama-server not found: {server}; run setup_qwen.sh")
+        raise FileNotFoundError(f"llama-server not found: {server}; run setup_localharness.sh")
     if getattr(arguments, "router", False):
         if arguments.model:
             raise ValueError("--router cannot be combined with --model; use an installed catalog preset.")
@@ -40,7 +42,7 @@ def command(arguments: argparse.Namespace) -> list[str]:
     else:
         model = arguments.model or root / "models" / config["filename"]
         if not model.is_file():
-            raise FileNotFoundError(f"Model not found: {model}; run setup_qwen.sh")
+            raise FileNotFoundError(f"Model not found: {model}; run setup_localharness.sh")
         model_options = ["--model", str(model)]
     device = getattr(arguments, "device", None) or (gpu.get("device") if gpu else None)
     device_options = ["--device", device] if device else []
@@ -116,6 +118,15 @@ def main() -> None:
                         help="Manual context override, bypassing automatic 64K/32K/16K/8K memory sizing")
     parser.add_argument("--context-report", action="store_true",
                         help="Estimate model contexts from free memory; no downloads, writes or server start")
+    parser.add_argument("--client", choices=("server", "opencode", "cline"), default="server",
+                        help="Low-level default: server only; package launchers default to OpenCode")
+    parser.add_argument("--interface", choices=("web", "terminal"), default="web",
+                        help="OpenCode interface (default: web)")
+    parser.add_argument("--prompt", help="Run one OpenCode request as JSON, then stop the owned server")
+    parser.add_argument("--skills-workspace", "--workspace", type=Path,
+                        help="Set up the shared skills module in this Cline/agent workspace before launch")
+    parser.add_argument("--skills-client", choices=("opencode", "cline", "generic"), default="opencode",
+                        help="Integration for explicit workspace setup (default: opencode)")
     parser.add_argument("--threads", type=int, default=min(8, os.cpu_count() or 1))
     parser.add_argument("--backend", choices=("auto", "cpu", "vulkan"), default="auto",
                         help="Use an installed portable Vulkan GPU runtime when available; otherwise CPU")
@@ -135,12 +146,31 @@ def main() -> None:
         parser.error("--context must be positive")
     if arguments.context_report and (arguments.context is not None or arguments.dry_run):
         parser.error('--context-report cannot be combined with --context or --dry-run')
+    if arguments.context_report and arguments.skills_workspace:
+        parser.error('--skills-workspace cannot be combined with read-only --context-report')
+    if arguments.prompt is not None and arguments.client != "opencode":
+        parser.error('--prompt requires --client opencode')
     if arguments.threads <= 0 or not 1 <= arguments.port <= 65535 or (
             arguments.gpu_layers is not None and arguments.gpu_layers < 0):
         parser.error("Use positive threads, port 1..65535 and non-negative GPU layers")
     try:
         config = selection(arguments.preset)
         root = Path(__file__).resolve().parent
+        if arguments.client != "server" and not arguments.context_report:
+            arguments.skills_workspace = arguments.skills_workspace or Path.cwd()
+            arguments.skills_client = arguments.client
+        if arguments.skills_workspace:
+            arguments.skills_workspace = arguments.skills_workspace.expanduser().resolve()
+            local_skills.install(arguments.skills_workspace, dry_run=True, client=arguments.skills_client)
+            if arguments.skills_client == "opencode":
+                opencode_client.ensure(dry_run=arguments.dry_run)
+            paths = local_skills.install(arguments.skills_workspace, arguments.dry_run,
+                                         client=arguments.skills_client)
+            print(f"Shared skills: {'would copy' if arguments.dry_run else 'copied'} {len(paths)} new files "
+                  f"for {arguments.skills_client} in {arguments.skills_workspace}", flush=True)
+            print("OpenCode loads the shared instructions automatically; see SKILLS.md." if
+                  arguments.skills_client == "opencode" else
+                  "Enable skills and configure the agent client's tools; see SKILLS.md.", flush=True)
         if arguments.setup_if_needed and not arguments.dry_run and not arguments.context_report:
             available_gpu = arguments.backend != "cpu" and gpu_runtime(config)
             need_runtime = not arguments.server and not (runtime_ready(config) or available_gpu)
@@ -148,11 +178,11 @@ def main() -> None:
                 root / "models" / config["filename"], config)
             if need_runtime or need_model:
                 if os.name == "nt":
-                    setup = ["powershell.exe", "-NoProfile", "-File", str(root / "setup_qwen.ps1"),
+                    setup = ["powershell.exe", "-NoProfile", "-File", str(root / "setup_localharness.ps1"),
                              "-ModelPreset", config["preset"]]
                     stage = "-RuntimeOnly" if need_runtime else "-ModelOnly"
                 else:
-                    setup = ["bash", str(root / "setup_qwen.sh"), "--model", config["preset"]]
+                    setup = ["bash", str(root / "setup_localharness.sh"), "--model", config["preset"]]
                     stage = "--runtime-only" if need_runtime else "--model-only"
                 if not (need_runtime and need_model):
                     setup.append(stage)
@@ -179,11 +209,14 @@ def main() -> None:
             print(f'Manual context override: {arguments.context:,}; automatic fit checks bypassed.', flush=True)
         if arguments.router and not arguments.dry_run:
             model_router.prepare(root, arguments.port, arguments.preset, arguments.context, contexts)
+        if arguments.client == "opencode" and not arguments.router:
+            invocation += ["--alias", config["preset"]]
     except (OSError, ValueError, subprocess.CalledProcessError) as exc:
         parser.error(str(exc))
     print("Starting local model server:")
     print(" ".join(invocation))
-    print(f"Browser: http://{arguments.host}:{arguments.port}")
+    print(f"{'Inference API' if arguments.client == 'opencode' else 'Browser'}: "
+          f"http://{arguments.host}:{arguments.port}")
     print("Stop it with Ctrl+C.")
     if arguments.router:
         print("Browser model switching enabled: installed models only, one loaded at a time.")
@@ -192,13 +225,23 @@ def main() -> None:
             print('Dry-run shows the preferred 64K setting; automatic hardware sizing runs at startup. '
                   'Use --context-report for a read-only estimate.')
         return
-    if arguments.open_browser:
+    if arguments.open_browser and arguments.client != "opencode":
         webbrowser.open(f"http://{arguments.host}:{arguments.port}")
     try:
+        if arguments.client == "opencode":
+            raise SystemExit(opencode_client.run(
+                invocation, server_environment(invocation[0], router=arguments.router),
+                arguments.skills_workspace, arguments.preset or config["preset"],
+                contexts or {key: arguments.context or selection(key)["context"] for key in (
+                    catalog()["models"] if arguments.router else [config["preset"]])
+                    if not arguments.router or model_ready(root / "models" / selection(key)["filename"], selection(key))},
+                arguments.host, arguments.port, arguments.interface, arguments.prompt))
         raise SystemExit(subprocess.call(invocation, env=server_environment(invocation[0], router=arguments.router)))
     except KeyboardInterrupt:
         print("\nServer stopped.")
         raise SystemExit(130)
+    except (OSError, ValueError, RuntimeError, subprocess.CalledProcessError) as exc:
+        parser.exit(1, f"ERROR: {exc}\n")
 
 
 if __name__ == "__main__":

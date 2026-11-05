@@ -3,7 +3,7 @@
 **Compatibility implemented; end-to-end testing deferred.** Syntax checks do
 not prove successful compilation, GPU operation or browser model switching.
 
-The Windows installer is a PowerShell counterpart to `setup_qwen.sh`. It keeps
+The Windows installer is a PowerShell counterpart to `setup_localharness.sh`. It keeps
 the source, compiled runtime, downloads, and model inside this folder.
 
 ## One-time prerequisites
@@ -31,15 +31,15 @@ Set-ExecutionPolicy -Scope Process Bypass
 python .\manage_models.py
 
 # Or use explicit setup commands instead of the menu:
-.\setup_qwen.ps1 -Preflight
-.\setup_qwen.ps1
+.\setup_localharness.ps1 -Preflight
+.\setup_localharness.ps1
 
 # Explicit model selection uses the same models.json as Linux
-.\setup_qwen.ps1 -ModelPreset qwen3.5-4b
+.\setup_localharness.ps1 -ModelPreset qwen3.5-4b
 
 # Optional text-chat alternatives, sharing the same compiled runtime:
-.\setup_qwen.ps1 -ModelPreset gemma4-e2b -ModelOnly
-.\setup_qwen.ps1 -ModelPreset phi4-mini -ModelOnly
+.\setup_localharness.ps1 -ModelPreset gemma4-e2b -ModelOnly
+.\setup_localharness.ps1 -ModelPreset phi4-mini -ModelOnly
 ```
 
 The execution-policy change applies only to that PowerShell process. You may
@@ -48,27 +48,27 @@ instead use your organization's approved script-signing policy.
 Build or download separately:
 
 ```powershell
-.\setup_qwen.ps1 -RuntimeOnly
-.\setup_qwen.ps1 -ModelOnly
+.\setup_localharness.ps1 -RuntimeOnly
+.\setup_localharness.ps1 -ModelOnly
 ```
 
 ## Start the browser interface
 
 ```powershell
-.\start_qwen.ps1
+.\start_localharness.ps1
 ```
 
-On the first run, `start_qwen.ps1` invokes setup automatically. Later runs go
+On the first run, `start_localharness.ps1` invokes setup automatically. Later runs go
 directly to the local server. Use `-NoBrowser` or `-Port 18080` when needed.
 
 ```powershell
-.\start_qwen.ps1 -ModelPreset qwen3.5-4b -Thinking off -Threads 8
+.\start_localharness.ps1 -ModelPreset qwen3.5-4b -Thinking off -Threads 8
 
 # Ctrl+C first, then choose a different installed model:
-.\start_qwen.ps1 -ModelPreset qwen3.8-27b -Thinking off
+.\start_localharness.ps1 -ModelPreset qwen3.8-27b -Thinking off
 
 # Or select installed models in the browser, with one model loaded at a time:
-.\start_qwen.ps1 -Router -Thinking off
+.\start_localharness.ps1 -Router -Thinking off
 ```
 
 With `-Context` omitted, the Python launcher prefers 64K and estimates memory
@@ -87,16 +87,20 @@ To list presets: `python .\run_server.py --list-models`. Selecting
 `qwen3-30b-a3b` explicitly downloads the old model if its weights are absent.
 The setup verifies the pinned model SHA-256 before accepting its `.part` file.
 Router mode lists installed catalog weights only and never downloads missing
-models. Add weights explicitly with `setup_qwen.ps1 -ModelPreset NAME -ModelOnly`,
+models. Add weights explicitly with `setup_localharness.ps1 -ModelPreset NAME -ModelOnly`,
 then restart the router. Windows router operation still needs an end-to-end test.
 The runtime is built CPU-only; CUDA is not silently enabled. Runtime-native
 HTTPS is disabled in this Windows build to avoid requiring an OpenSSL SDK;
 model downloads still use HTTPS through Windows curl.
 
-If the browser does not open, visit `http://127.0.0.1:8080` after the terminal
-reports that the model is loaded. Keep PowerShell open; press `Ctrl+C` to stop.
+OpenCode is now the start-script default. It prints its own web-interface URL;
+`http://127.0.0.1:8080` is the inference server, not the OpenCode interface.
+Use `-Client cline` to retain Cline IDE support or `-Client browser` for the
+previous plain chat. See [SKILLS.md](SKILLS.md). Keep PowerShell open and press
+`Ctrl+C` to stop. OpenCode installation/runtime on Windows remains unverified.
 
 ## What it does not do
 
-The local browser is a chat interface. It does not automatically receive file,
-terminal, GitHub, or operating-system permissions.
+The plain llama.cpp browser remains chat only. OpenCode and Cline provide their
+own agent tools and permissions. No GitHub or WRF connection is configured
+automatically, and no separate image-generation backend is installed.

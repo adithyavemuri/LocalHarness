@@ -1,5 +1,26 @@
 # Changes
 
+## LocalHarness rename — unreleased
+
+- Renamed the project from qwen-local to LocalHarness, including repository URLs,
+  setup examples and documentation.
+- Added `setup_localharness.sh` / `.ps1` and `start_localharness.sh` / `.ps1`
+  as the primary commands; existing Qwen-named commands forward to them.
+- Kept existing checkout paths, model preset names and `QWEN_*` environment
+  variables compatible. OpenCode remains the default, and Cline remains supported.
+
+## Shared skills and OpenCode default — unreleased
+
+- Added a model-independent `local_skills` module for Qwen, Gemma and Phi.
+- Made OpenCode the model-manager and start-script default, with a pinned,
+  checksum-verified Linux/Windows x64 installation below the package directory.
+- Added automatic local-provider/context setup, preloaded skill instructions,
+  web/terminal/one-shot interfaces, Context7 registration and local Graphify detection.
+- Retained explicit Cline setup/launch and the original plain browser/API mode.
+- Added offline integration checks and real installed-model client probes.
+- Kept native model tool compliance separate from instruction loading; Phi's
+  current GGUF template failed the native skill-call probe.
+
 ## 64K preferred context — unreleased
 
 - Raised the preferred context to 65,536 tokens, with 32K/16K/8K fallbacks.

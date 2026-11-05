@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Load installed weights, check HTTP/UI and two short replies, then stop.
 
-Run from qwen-local:
+Run from the LocalHarness checkout:
     python3 examples/smoke_test.py --preset qwen3.8-27b
 
 No downloads, root access or external model API. Results go to logs/.

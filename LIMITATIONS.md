@@ -44,6 +44,12 @@
   or model_config.py --verify again when you need to recheck file integrity.
 - The browser binds locally and provides chat only. It cannot inspect files,
   execute code, maintain GitHub, or call the WRF package.
+- The [shared skills module](SKILLS.md) uses OpenCode by default and retains
+  Cline support. Agent tools use the selected client's permissions; the plain
+  llama.cpp chat remains tool-free. Setup installs OpenCode, but not Graphify or
+  an image backend, and cannot guarantee model compliance or native tool use.
+  Context7 documentation retrieval requires an external service. Each model's
+  tool support and the Cline workflow require separate validation.
 - A language model response is not evidence of correctness and must not replace
   deterministic source inspection or scientific validation.
 - This is a GitHub scripts project, not a pip-installable distribution or a

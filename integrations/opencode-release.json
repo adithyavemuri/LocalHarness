@@ -1,0 +1,15 @@
+{
+  "version": "1.19.5",
+  "linux_x64": {
+    "filename": "opencode-linux-x64-baseline.tar.gz",
+    "size_bytes": 79651821,
+    "sha256": "17c200fd4b2289954cc01552559f9b6d03ec157b2ddfb5eb54144f491656333d",
+    "url": "https://github.com/anomalyco/opencode/releases/download/v1.19.5/opencode-linux-x64-baseline.tar.gz"
+  },
+  "windows_x64": {
+    "filename": "opencode-windows-x64-baseline.zip",
+    "size_bytes": 81738223,
+    "sha256": "e4dac5cd38a182a24e7b3e18853f01d08cdb137e50b3bd1397c1a89e54d28c63",
+    "url": "https://github.com/anomalyco/opencode/releases/download/v1.19.5/opencode-windows-x64-baseline.zip"
+  }
+}

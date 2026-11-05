@@ -244,11 +244,23 @@ class ModelTests(unittest.TestCase):
 
     @unittest.skipIf(os.name == "nt", "Bash syntax check is performed on Linux")
     def test_bash_syntax_and_unknown_preset(self):
-        subprocess.run(["bash", "-n", str(ROOT / "setup_qwen.sh"), str(ROOT / "start_qwen.sh")], check=True)
-        result = subprocess.run(["bash", str(ROOT / "setup_qwen.sh"), "--model", "bad", "--preflight"],
-                                capture_output=True, text=True)
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("Unknown preset", result.stderr)
+        for name in ("setup_localharness.sh", "start_localharness.sh", "setup_qwen.sh", "start_qwen.sh"):
+            with self.subTest(script=name):
+                subprocess.run(["bash", "-n", str(ROOT / name)], check=True)
+        for name in ("setup_localharness.sh", "setup_qwen.sh"):
+            with self.subTest(script=name):
+                result = subprocess.run(["bash", str(ROOT / name), "--model", "bad", "--preflight"],
+                                        capture_output=True, text=True)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("Unknown preset", result.stderr)
+        outputs = []
+        for name in ("start_localharness.sh", "start_qwen.sh"):
+            result = subprocess.run(["bash", str(ROOT / name), "--list-models"],
+                                    capture_output=True, text=True, check=True,
+                                    env={"PATH": os.defpath})
+            outputs.append(result.stdout)
+        self.assertEqual(outputs[0], outputs[1])
+        self.assertIn("phi4-mini", outputs[0])
 
 
 if __name__ == "__main__":

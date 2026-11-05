@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import os
+from pathlib import Path
 import shlex
 import shutil
 import subprocess
@@ -15,15 +16,28 @@ from model_config import ROOT, catalog, model_ready, selection, verify_model
 def setup_command(preset: str, windows: bool | None = None) -> list[str]:
     windows = os.name == "nt" if windows is None else windows
     if windows:
-        return ["powershell.exe", "-NoProfile", "-File", str(ROOT / "setup_qwen.ps1"),
+        return ["powershell.exe", "-NoProfile", "-File", str(ROOT / "setup_localharness.ps1"),
                 "-ModelPreset", preset, "-ModelOnly"]
-    return ["bash", str(ROOT / "setup_qwen.sh"), "--model", preset, "--model-only"]
+    return ["bash", str(ROOT / "setup_localharness.sh"), "--model", preset, "--model-only"]
 
 
-def launch_command(preset: str | None = None, browser: bool = False) -> list[str]:
+def launch_command(preset: str | None = None, browser: bool = False,
+                   skills_workspace: Path | None = None, skills_client: str = "opencode",
+                   client: str = "opencode", interface: str = "web", prompt: str | None = None) -> list[str]:
     command = [sys.executable, str(ROOT / "run_server.py"), "--setup-if-needed",
-               "--open-browser", "--thinking", "off"]
-    return command + (["--router"] if browser else ["--preset", preset])
+               "--thinking", "off", "--client", "server" if client == "browser" else client]
+    if client == "browser":
+        command += ["--open-browser"]
+    else:
+        skills_workspace = skills_workspace or Path.cwd()
+        skills_client = client
+        command += ["--interface", interface]
+    if prompt is not None:
+        command += ["--prompt", prompt]
+    command += (["--router"] if browser else ["--preset", preset])
+    if skills_workspace is not None:
+        command += ["--skills-workspace", str(skills_workspace.expanduser().resolve()), "--skills-client", skills_client]
+    return command
 
 
 def show_models() -> None:
@@ -70,24 +84,32 @@ def install(preset: str, yes: bool = False, dry_run: bool = False) -> int:
     return run(setup_command(preset))
 
 
-def start(preset: str, yes: bool = False, dry_run: bool = False) -> int:
+def start(preset: str, yes: bool = False, dry_run: bool = False,
+          skills_workspace: Path | None = None, skills_client: str = "opencode",
+          client: str = "opencode", interface: str = "web", prompt: str | None = None) -> int:
     model = selection(preset)
     if not dry_run and not model_ready(ROOT / "models" / model["filename"], model):
         result = install(preset, yes=yes)
         if result:
             return result
     print("A missing CPU runtime is compiled locally; host build prerequisites are required.")
-    return run(launch_command(preset), dry_run=dry_run)
+    return run(launch_command(preset, skills_workspace=skills_workspace, skills_client=skills_client,
+                              client=client, interface=interface, prompt=prompt),
+               dry_run=dry_run)
 
 
-def browser(dry_run: bool = False) -> int:
+def browser(dry_run: bool = False, skills_workspace: Path | None = None,
+            skills_client: str = "opencode", client: str = "opencode", interface: str = "web",
+            prompt: str | None = None) -> int:
     if not dry_run and not any(model_ready(ROOT / "models" / model["filename"], model)
                                for model in catalog()["models"].values()):
         raise ValueError("Install at least one catalog model before starting browser switching.")
-    return run(launch_command(browser=True), dry_run=dry_run)
+    return run(launch_command(browser=True, skills_workspace=skills_workspace, skills_client=skills_client,
+                              client=client, interface=interface, prompt=prompt),
+               dry_run=dry_run)
 
 
-def menu() -> int:
+def menu(client: str = "opencode", interface: str = "web", skills_workspace: Path | None = None) -> int:
     keys = list(catalog()["models"])
     while True:
         show_models()
@@ -95,7 +117,7 @@ def menu() -> int:
         if answer == "q":
             return 0
         if answer == "b":
-            browser()
+            browser(client=client, interface=interface, skills_workspace=skills_workspace)
             continue
         if not answer.isdigit() or not 1 <= int(answer) <= len(keys):
             print("Please choose a listed number, B or Q.")
@@ -106,7 +128,7 @@ def menu() -> int:
         if action == "1":
             install(preset)
         elif action == "2":
-            start(preset)
+            start(preset, client=client, interface=interface, skills_workspace=skills_workspace)
         elif action == "3":
             model = selection(preset)
             verify_model(ROOT / "models" / model["filename"], model)
@@ -120,12 +142,23 @@ def main() -> int:
                          help="Download and verify one catalog model (asks before missing-weight downloads)")
     actions.add_argument("--start", choices=list(catalog()["models"]), metavar="PRESET",
                          help="Launch one model, asking before a missing-weight download")
-    actions.add_argument("--browser", action="store_true", help="Switch installed models in the browser")
+    actions.add_argument("--browser", action="store_true", help="Route installed models, one loaded at a time")
+    parser.add_argument("--client", choices=("opencode", "cline", "browser"), default="opencode",
+                        help="Default: OpenCode; cline keeps IDE support, browser opens plain llama.cpp chat")
+    parser.add_argument("--interface", choices=("web", "terminal"), default="web")
+    parser.add_argument("--prompt", help="One-shot OpenCode request with JSON output")
+    parser.add_argument("--skills-workspace", "--workspace", type=Path,
+                        help="Set up shared skills in this agent workspace as part of --start or --browser")
+    parser.add_argument("--skills-client", choices=("opencode", "cline", "generic"), default="opencode")
     parser.add_argument("--yes", action="store_true", help="Confirm an explicitly selected model download")
     parser.add_argument("--dry-run", action="store_true", help="Print a non-interactive command without executing it")
     args = parser.parse_args()
     if args.dry_run and not (args.install or args.start or args.browser):
         parser.error("--dry-run needs --install, --start or --browser")
+    if args.skills_workspace and (args.install or args.list):
+        parser.error("--skills-workspace needs --start or --browser; use python -m local_skills for setup only")
+    if args.prompt is not None and (args.client != "opencode" or not (args.start or args.browser)):
+        parser.error("--prompt requires --client opencode and --start or --browser")
     try:
         if args.list:
             show_models()
@@ -135,10 +168,14 @@ def main() -> int:
         if args.install:
             return install(args.install, yes=args.yes, dry_run=args.dry_run)
         if args.start:
-            return start(args.start, yes=args.yes, dry_run=args.dry_run)
+            return start(args.start, yes=args.yes, dry_run=args.dry_run,
+                         skills_workspace=args.skills_workspace, skills_client=args.skills_client,
+                         client=args.client, interface=args.interface, prompt=args.prompt)
         if args.browser:
-            return browser(dry_run=args.dry_run)
-        return menu()
+            return browser(dry_run=args.dry_run, skills_workspace=args.skills_workspace,
+                           skills_client=args.skills_client, client=args.client,
+                           interface=args.interface, prompt=args.prompt)
+        return menu(client=args.client, interface=args.interface, skills_workspace=args.skills_workspace)
     except (OSError, ValueError) as error:
         print(f"ERROR: {error}", file=sys.stderr)
         return 1

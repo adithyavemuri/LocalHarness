@@ -1,17 +1,22 @@
-# Local models: Qwen, Gemma and Phi
+# LocalHarness
 
-[![checks](https://github.com/adithyavemuri/qwen-local/actions/workflows/checks.yml/badge.svg)](https://github.com/adithyavemuri/qwen-local/actions/workflows/checks.yml)
+[![checks](https://github.com/adithyavemuri/LocalHarness/actions/workflows/checks.yml/badge.svg)](https://github.com/adithyavemuri/LocalHarness/actions/workflows/checks.yml)
 
 **Beta:** Linux operation is locally verified. Windows x64 compatibility is
 implemented, but installation, model loading and browser switching have not
 been validated end to end on Windows. See [support status](SUPPORT.md).
 
-This folder builds a pinned local `llama.cpp` runtime, downloads a selected model
-GGUF, and starts a private browser chat. **Qwen3.5-4B Q4_K_M is the default.**
+LocalHarness builds a pinned local `llama.cpp` runtime, downloads a selected model
+GGUF, and starts **OpenCode by default**, with shared local-model skills.
+**Qwen3.5-4B Q4_K_M is the default model.** Cline remains supported.
 Linux and Windows x64 use the same model catalog and Python launcher.
-Generated files remain inside this folder; no root access is used.
+Runtime/download/client state remains inside this folder; skills are copied
+into the project you select. No root access is used.
 
-Already have models installed? Use `./start_qwen.sh --router --thinking off`
+Use `--client cline` with the model manager for the Cline IDE workflow, or
+`--client browser` for the previous plain llama.cpp chat. See [skills and client setup](SKILLS.md).
+
+Already have models installed? Use `./start_localharness.sh --router --thinking off`
 to switch between them in the browser without restarting the server.
 
 ## Quick start
@@ -20,16 +25,16 @@ Clone the repository. Python 3.10+ is required; no Python dependencies need to
 be installed with pip. This is a scripts-based GitHub project, not a PyPI package.
 
 ```bash
-git clone https://github.com/adithyavemuri/qwen-local.git
-cd qwen-local
+git clone https://github.com/adithyavemuri/LocalHarness.git
+cd LocalHarness
 python3 manage_models.py
 ```
 
 Windows, from Developer PowerShell for Visual Studio 2022:
 
 ```powershell
-git clone https://github.com/adithyavemuri/qwen-local.git
-cd qwen-local
+git clone https://github.com/adithyavemuri/LocalHarness.git
+cd LocalHarness
 python manage_models.py
 ```
 
@@ -37,6 +42,8 @@ The menu shows model download sizes, installed status, free disk space and
 model-specific cautions. Choose a number, then install or launch it. Missing
 weights require confirmation; nothing downloads just by opening the menu.
 After installing models, choose **B** for browser model switching.
+Launching also installs a pinned OpenCode binary when missing. Its first
+bootstrap needs network access; merely opening the menu downloads nothing.
 
 First-time compilation needs Git, a C++ compiler and build tools on Linux, or
 Visual Studio C++/CMake tools on Windows. The menu does not install those system
@@ -51,10 +58,12 @@ python3 manage_models.py --install gemma4-e2b
 python3 manage_models.py --install phi4-mini --dry-run
 python3 manage_models.py --start phi4-mini
 python3 manage_models.py --browser
+python3 manage_models.py --start gemma4-e2b --workspace /path/to/project
+python3 manage_models.py --start qwen3.5-4b --client cline --workspace /path/to/project
 ```
 
 `--yes` confirms an explicitly selected model download for automation. The
-existing `start_qwen.sh` / `start_qwen.ps1` entry points remain available.
+`start_localharness.sh` / `start_localharness.ps1` entry points also set up and launch OpenCode.
 
 ## Choose a model
 
@@ -73,32 +82,38 @@ file size and SHA-256, and the runtime source revision/commit. Read
 Only the selected model is downloaded. Preset availability does not mean its
 weights are installed. Neither setup nor the launcher deletes other weights.
 
-The `qwen-local` folder, script names and `QWEN_*` environment variables are
-retained for compatibility; model selection is shared across all catalog families.
+LocalHarness was previously named `qwen-local`. Existing checkouts can keep their
+current folder name; paths are resolved relative to the checkout. The old
+`start_qwen.sh` / `start_qwen.ps1` and `setup_qwen.sh` / `setup_qwen.ps1` commands
+forward to the LocalHarness commands with the same arguments. Existing `QWEN_*`
+environment variables remain supported for all catalog families.
 GGUF conversions are published by the organizations listed above, not necessarily
 the original model developers. Model licenses are separate from this launcher's
 license. Gemma and Phi presets enable text chat only; no vision/audio projector
-is downloaded and no new tools or filesystem permissions are granted.
+is downloaded. Agent tools belong to the selected client and use its permissions.
 
 ```bash
 # Explicitly add another model without rebuilding the existing runtime:
-./setup_qwen.sh --model gemma4-e2b --model-only
-./setup_qwen.sh --model phi4-mini --model-only
+./setup_localharness.sh --model gemma4-e2b --model-only
+./setup_localharness.sh --model phi4-mini --model-only
 # Then restart router mode to show all complete installed models:
-./start_qwen.sh --router --thinking off
+./start_localharness.sh --router --thinking off
 ```
 
 ### Switch models inside the browser
 
-Stop the current single-model server with Ctrl+C, then start router mode:
+The following commands use the retained plain llama.cpp browser. Stop the
+current single-model server with Ctrl+C, then start router mode:
 
 ```bash
-./start_qwen.sh --router --thinking off
+./start_localharness.sh --client server --router --thinking off
 ```
 
-Windows: `.\start_qwen.ps1 -Router -Thinking off`.
+Windows: `.\start_localharness.ps1 -Client browser -Router -Thinking off`.
 
-Open `http://127.0.0.1:8080`, start a chat and choose a model from the browser's
+By default OpenCode opens with the configured local models. To use the previous
+plain browser selector, add `--client server` to `start_localharness.sh`, then
+open `http://127.0.0.1:8080`, start a chat and choose a model from the browser's
 model selector. Only complete, installed catalog weights are listed. The default
 model loads first; choosing another model for a request unloads the previous
 one. Only **one model instance** is allowed at a time, to limit RAM/VRAM usage.
@@ -109,8 +124,8 @@ Router mode is offline: it does not download missing weights. To add the missing
 30B preset, explicitly download it, then restart the router to refresh its list:
 
 ```bash
-./setup_qwen.sh --model qwen3-30b-a3b --model-only
-./start_qwen.sh --router --thinking off
+./setup_localharness.sh --model qwen3-30b-a3b --model-only
+./start_localharness.sh --client server --router --thinking off
 ```
 
 Use `--router --preset qwen3.8-27b` to change the initially loaded model, or
@@ -122,19 +137,19 @@ is not transferred. Start a new chat for clean model comparisons.
 
 ```bash
 python3 run_server.py --list-models
-./setup_qwen.sh --model qwen3.5-4b
-./start_qwen.sh --preset qwen3.5-4b --thinking off
+./setup_localharness.sh --model qwen3.5-4b
+./start_localharness.sh --preset qwen3.5-4b --thinking off
 
 # To switch: Ctrl+C, then start the other preset. Installed weights are reused.
-./start_qwen.sh --preset qwen3.8-27b --thinking off
+./start_localharness.sh --preset qwen3.8-27b --thinking off
 ```
 
 Windows equivalents:
 
 ```powershell
 python .\run_server.py --list-models
-.\setup_qwen.ps1 -ModelPreset qwen3.5-4b
-.\start_qwen.ps1 -ModelPreset qwen3.5-4b
+.\setup_localharness.ps1 -ModelPreset qwen3.5-4b
+.\start_localharness.ps1 -ModelPreset qwen3.5-4b
 ```
 
 The start scripts rebuild a missing or outdated runtime and download missing
@@ -145,11 +160,11 @@ An existing final file is verified and reused; an invalid one is not overwritten
 Run the explicit preflight first when diagnosing a new machine:
 
 ```bash
-./setup_qwen.sh --preflight
+./setup_localharness.sh --preflight
 ```
 
 ```powershell
-.\setup_qwen.ps1 -Preflight
+.\setup_localharness.ps1 -Preflight
 ```
 
 See [WINDOWS_GUIDE.md](WINDOWS_GUIDE.md) for Windows prerequisites and
@@ -164,7 +179,7 @@ See [WINDOWS_GUIDE.md](WINDOWS_GUIDE.md) for Windows prerequisites and
 3. Clones a pinned `llama.cpp` revision into `build/`.
 4. Compiles CPU versions of `llama-server` and `llama-cli` locally.
 5. Downloads the selected, revision-pinned GGUF into `models/` and checks SHA-256.
-6. Leaves all generated files under `qwen-local/`.
+6. Leaves all generated files under `LocalHarness/`.
 
 The browser selector routes each request to one selected model. It does not
 make the models collaborate, merge their weights, or make them validate each
@@ -194,10 +209,10 @@ an allocation guarantee. See [context sizing](CONTEXT_SIZING.md).
 python3 run_server.py --router --context-report
 
 # Automatic sizing is enabled when --context is omitted:
-./start_qwen.sh --router --thinking off
+./start_localharness.sh --router --thinking off
 
 # An explicit value bypasses automatic sizing (you accept memory-fit risk):
-./start_qwen.sh --router --context 65536 --thinking off
+./start_localharness.sh --router --context 65536 --thinking off
 ```
 
 In router mode each model may receive a different context. Match a connected
@@ -207,16 +222,16 @@ does not resize an already-running server. Stop the old server first.
 ## Linux installation
 
 ```bash
-cd qwen-local
-./setup_qwen.sh --preflight
-./setup_qwen.sh
+cd LocalHarness
+./setup_localharness.sh --preflight
+./setup_localharness.sh
 ```
 
 Build only the runtime or download only the model:
 
 ```bash
-./setup_qwen.sh --runtime-only
-./setup_qwen.sh --model-only
+./setup_localharness.sh --runtime-only
+./setup_localharness.sh --model-only
 ```
 
 The download is resumable. The script never invokes a system package manager.
@@ -238,6 +253,15 @@ http://127.0.0.1:8080
 Press `Ctrl+C` to stop it.
 
 For a short operator-oriented version, see `BROWSER_GUIDE.md`.
+
+For local models with coding tools and reusable skills, use the optional
+[shared skills module](SKILLS.md). Its Graphify, Context7, Karpathy and
+Ian/Xiaohei adapters are shared across Qwen, Gemma and Phi, independently of
+model selection. [Cline setup](integrations/cline/README.md) is included; another
+agent client can use the generic skill bundles. OpenCode provides the default
+agent browser; the underlying llama.cpp browser remains text chat.
+Start with `python3 -m local_skills --workspace /path/to/project --dry-run`, or
+add `--skills-workspace /path/to/project` to a model-manager launch.
 
 To open the browser automatically:
 
@@ -271,7 +295,7 @@ does not install, replace or upgrade drivers or system libraries:
 
 ```bash
 python3 setup_gpu.py
-./start_qwen.sh --preset qwen3.5-4b --backend vulkan --thinking off
+./start_localharness.sh --preset qwen3.5-4b --backend vulkan --thinking off
 ```
 
 This downloads approximately 30 MB of official Vulkan binaries/libraries,
@@ -312,8 +336,8 @@ the user's responsibility.
 
 The launcher binds to `127.0.0.1`, so it is available only on this computer. Do
 not change the host to `0.0.0.0` unless you understand the network exposure and
-add appropriate authentication. This launcher does not enable filesystem tools
-or connect Qwen to another program.
+add appropriate authentication. The inference server's own filesystem tools stay
+disabled. OpenCode and Cline provide agent tools under their own permissions.
 
 The launcher explicitly disables the runtime's agent mode and UI MCP proxy,
 and restricts browser CORS origins to localhost. These are not authentication
@@ -323,13 +347,17 @@ See `LIMITATIONS.md` for the complete supported boundary.
 
 ## Repository contents
 
-- `setup_qwen.sh`: Linux setup
+- `setup_localharness.sh`: Linux setup
 - `manage_models.py`: cross-platform model menu and install/start commands
-- `setup_qwen.ps1`: Windows x64 setup
-- `start_qwen.sh`: one-command Linux setup/start
-- `start_qwen.ps1`: one-command Windows setup/start
+- `setup_localharness.ps1`: Windows x64 setup
+- `start_localharness.sh`: one-command Linux setup/start
+- `start_localharness.ps1`: one-command Windows setup/start
+- `start_qwen.*` / `setup_qwen.*`: compatibility wrappers for existing workflows
 - `run_server.py`: cross-platform server launcher
 - `setup_gpu.py`: optional, checksum-pinned Linux Vulkan runtime installer
+- `setup_opencode.py` / `opencode_client.py`: pinned OpenCode setup and managed launch
+- `local_skills/` / `SKILLS.md`: shared instruction module and client workflows
+- `setup_cline.py`: retained Cline workspace setup
 - `models.json` / `model_config.py`: shared model pins, selection and verification
 - `model_router.py`: installed-only, offline browser routing configuration
 - `tests/test_local_qwen.py`: offline configuration and launcher regression tests

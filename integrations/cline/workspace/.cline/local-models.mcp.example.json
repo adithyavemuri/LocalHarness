@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "graphify": {
+      "command": "/absolute/path/to/graphify-mcp",
+      "args": ["--graph", "/absolute/path/to/workspace/graphify-out/graph.json"],
+      "env": {"GRAPHIFY_BACKEND": "none"},
+      "disabled": true,
+      "autoApprove": []
+    },
+    "context7": {
+      "type": "streamableHttp",
+      "url": "https://mcp.context7.com/mcp",
+      "disabled": true,
+      "autoApprove": []
+    }
+  }
+}

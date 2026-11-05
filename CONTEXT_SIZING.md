@@ -7,8 +7,8 @@ changes in this check. Model weights are not loaded for the estimate.
 
 ```bash
 python3 run_server.py --router --context-report   # inspect only
-./start_qwen.sh --router --thinking off           # size automatically and start
-./start_qwen.sh --router --context 65536          # manual override, not a fit check
+./start_localharness.sh --router --thinking off           # size automatically and start
+./start_localharness.sh --router --context 65536          # manual override, not a fit check
 ```
 
 The default policy tries **64K → 32K → 16K → 8K**. It never chooses a larger window
